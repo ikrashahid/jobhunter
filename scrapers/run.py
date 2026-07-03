@@ -3,7 +3,7 @@ load_dotenv()
 
 from adzuna import fetch_adzuna
 from upwork import fetch_upwork
-from store import store_postings
+from storejob import store_postings
 
 
 def run():
@@ -15,18 +15,22 @@ def run():
     print("total jobs fetched:", len(jobs))
     
 
-    print("\nUpwork gigs:")
-    gigs = fetch_upwork()
+    # print("\nUpwork gigs:")
+    # gigs = fetch_upwork()
+    # print("total gigs fetched:", len(gigs))
 
-    all_postings = jobs + gigs
-    print(f"\nTotal fetched: {len(all_postings)} ({len(jobs)} jobs, {len(gigs)} gigs)")
+    # all_postings = jobs + gigs
+    # print(f"\nTotal fetched: {len(all_postings)} ({len(jobs)} jobs, {len(gigs)} gigs)")
 
-    # # # Store everything
+    # # Store everything
     print("\nStoring to Supabase...")
-    result = store_postings(all_postings)
-    print(f"Inserted: {result['inserted']}  Skipped (duplicates): {result['skipped']}")
+    result = store_postings(jobs)
+    print(
+    f"Inserted: {result['inserted']} | "
+    f"Duplicates: {result['duplicates']} | "
+    f"Empty URLs: {result['empty_urls']}")
 
-    # print("\n── Done ──\n")
+    print("\n── Done ──\n")
 
 
 if __name__ == "__main__":
