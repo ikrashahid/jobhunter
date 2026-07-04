@@ -5,3 +5,5 @@ python-dotenv
 supabase
 sentence-transformers
 requests
+rank-bm25
+numpy
