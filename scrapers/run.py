@@ -2,33 +2,41 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from adzuna import fetch_adzuna
-from upwork import fetch_upwork
-from storejob import store_postings
+from himalayas import fetch_himalayas
+from remotive import fetch_remotive
+from weworkremotely import fetch_weworkremotely
+from store import store_postings
 
 
 def run():
-    print("\n── Job + Gig Copilot: Fetching ──\n")
+    print("\n── Job Copilot: Fetching ──\n")
 
-    # Fetch from both sources
+    results = {}
+
     print("Adzuna jobs:")
-    jobs = fetch_adzuna(pages=2)
-    print("total jobs fetched:", len(jobs))
-    
+    results["adzuna"] = fetch_adzuna(pages=2)
 
-    # print("\nUpwork gigs:")
-    # gigs = fetch_upwork()
-    # print("total gigs fetched:", len(gigs))
+    print("\nHimalayas remote jobs:")
+    results["himalayas"] = fetch_himalayas()
 
-    # all_postings = jobs + gigs
-    # print(f"\nTotal fetched: {len(all_postings)} ({len(jobs)} jobs, {len(gigs)} gigs)")
+    print("\nRemotive remote jobs:")
+    results["remotive"] = fetch_remotive()
 
-    # # Store everything
+    print("\nWe Work Remotely:")
+    results["wwr"] = fetch_weworkremotely()
+
+    # Combine everything
+    all_postings = []
+    for source, postings in results.items():
+        all_postings.extend(postings)
+        print(f"  {source}: {len(postings)} fetched")
+
+    print(f"\nTotal fetched: {len(all_postings)}")
+
+    # Store with deduplication
     print("\nStoring to Supabase...")
-    result = store_postings(jobs)
-    print(
-    f"Inserted: {result['inserted']} | "
-    f"Duplicates: {result['duplicates']} | "
-    f"Empty URLs: {result['empty_urls']}")
+    result = store_postings(all_postings)
+    print(f"Inserted: {result['inserted']}  Skipped (duplicates): {result['skipped']}")
 
     print("\n── Done ──\n")
 
