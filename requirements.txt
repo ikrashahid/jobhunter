@@ -7,3 +7,11 @@ sentence-transformers
 requests
 rank-bm25
 numpy
+ragas
+datasets
+crewai
+langchain-groq
+langchain-community
+langchain-core
+tavily-python
+langchain-groq
