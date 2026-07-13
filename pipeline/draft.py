@@ -10,8 +10,7 @@ for _parent in [Path(__file__).parent, Path(__file__).parent.parent]:
 
 from crewai import Agent, Task, Crew, Process, LLM
 from crewai_tools import TavilySearchTool
-import crewai.llms.cache as _crewai_cache
-_crewai_cache.mark_cache_breakpoint = lambda msg: msg
+
 
 def _get_llm():
     return LLM(
@@ -21,7 +20,6 @@ def _get_llm():
 
 
 def _get_search_tool():
-    # TavilySearchTool reads TAVILY_API_KEY from environment automatically
     return TavilySearchTool()
 
 
@@ -43,12 +41,16 @@ def draft_cover_letter(
     researcher = Agent(
         role="Company Intelligence Specialist",
         goal=(
-            "Find one or two specific, recent things about this company "
-            "that would make a cover letter feel genuinely informed."
+            "Find specific, concrete details about what this company builds "
+            "and what their engineering culture looks like."
         ),
         backstory=(
-            "You research companies for job applicants. You skip generic descriptions "
-            "and find what makes this specific company distinct right now."
+            "You research companies for job applicants. "
+            "You completely ignore acquisitions, funding rounds, and financial news. "
+            "You focus only on what the company actually builds, their tech stack, "
+            "their engineering problems, and what kind of work happens day to day. "
+            "You find one specific technical or product detail that makes the "
+            "company interesting to an engineer."
         ),
         tools=[search],
         llm=llm,
@@ -59,15 +61,21 @@ def draft_cover_letter(
     drafter = Agent(
         role="Technical Cover Letter Writer",
         goal=(
-            "Write a cover letter grounded entirely in the candidate's resume. "
-            "Never invent or exaggerate. Every claim must trace back to a real "
-            "bullet point or project in the resume sections provided."
+            "Write a cover letter that sounds like a confident engineer "
+            "wrote it, not a job applicant. "
+            "Every claim must trace back to the resume sections provided. "
+            "Never invent tools, projects, or experience."
         ),
         backstory=(
-            "You write cover letters for AI engineers applying to technical roles. "
-            "Your strict rule: if the resume does not say it, you do not say it. "
-            "No em dashes. No I am passionate about. No excited to apply. "
-            "Direct, specific, varied sentence lengths."
+            "You write cover letters for AI engineers. "
+            "Your rules: if the resume does not say it, you do not say it. "
+            "You never use: em dashes, passionate, excited, I would love to, "
+            "I believe, I am eager, leverage, utilize, aligns with, "
+            "fast-paced, collaborative team, strong foundation, "
+            "natural next step, driving innovation, delivering impact, "
+            "I am comfortable, I am interested in, with my skills. "
+            "You write like a person who knows what they built and why it matters. "
+            "Short sentences. Specific details. No fluff."
         ),
         tools=[],
         llm=llm,
@@ -76,13 +84,22 @@ def draft_cover_letter(
 
     refiner = Agent(
         role="Human-Voice Editor",
-        goal="Make the cover letter sound like a real person wrote it.",
+        goal=(
+            "Strip every generic corporate phrase from the letter "
+            "and make it sound like a real engineer wrote it."
+        ),
         backstory=(
-            "You edit cover letters to remove AI-detectable patterns. "
-            "You cut em dashes, passionate, excited, I would love to, "
-            "I believe, I am eager, leverage, utilize, and anything templated. "
-            "You keep every specific fact and project reference intact. "
-            "Output only the final letter with no preamble and no commentary."
+            "You edit cover letters with zero tolerance for AI-sounding language. "
+            "You remove: em dashes, passionate, excited, I would love to, "
+            "I believe, I am eager, leverage, utilize, aligns with, "
+            "fast-paced, collaborative team, strong foundation, "
+            "natural next step, driving innovation, delivering impact, "
+            "I am comfortable, I am interested in, with my skills, "
+            "make me a good fit, I am confident, I am dedicated. "
+            "When you find a banned phrase you rewrite that sentence from scratch. "
+            "You keep every project name, tool name, and number exactly as written. "
+            "Output only the final letter. No preamble. No commentary. "
+            "No 'Here is the refined cover letter' before the text."
         ),
         tools=[],
         llm=llm,
@@ -93,17 +110,23 @@ def draft_cover_letter(
         description=f"""
 Research the company '{company}' for the role '{job_title}'.
 
-Find:
-1. What the company actually does in one specific sentence
-2. One recent specific thing: a product launch, funding round, or tech decision
-3. What kind of engineer would genuinely fit here based on the JD
+IGNORE completely: acquisitions, mergers, funding rounds, stock prices,
+financial transactions, and investment activity. These are useless for
+a cover letter.
+
+FIND instead:
+1. What this company actually builds or ships — one specific sentence
+2. One technical or product detail that an engineer would find genuinely
+   interesting — a specific tool, architecture decision, product feature,
+   or engineering problem they are solving
+3. What kind of engineer thrives here based on the JD
 
 Job description excerpt:
 {job_description[:800]}
         """,
         expected_output=(
-            "3 to 4 sentences of specific, recent company intelligence. "
-            "No generic language."
+            "3 sentences maximum. Specific technical or product detail. "
+            "No financial news. No generic company descriptions."
         ),
         agent=researcher,
     )
@@ -113,7 +136,14 @@ Job description excerpt:
 Write a cover letter for this application.
 
 STRICT CONSTRAINT: Every factual claim must come directly from the
-resume sections below. Do not invent tools, projects, or experience.
+resume sections below. Do not invent anything.
+
+BANNED PHRASES — never use these:
+- passionate, excited, I would love to, I believe, I am eager
+- leverage, utilize, aligns with, fast-paced, collaborative team
+- strong foundation, natural next step, driving innovation
+- delivering impact, I am comfortable, I am interested in
+- with my skills, make me a good fit, I am confident
 
 Job title: {job_title}
 Company: {company}
@@ -121,33 +151,61 @@ Company: {company}
 Job description:
 {job_description[:1500]}
 
-Resume sections:
+Resume sections — only facts from here may appear:
 {resume_context[:2000]}
 
-Structure:
-- Paragraph 1: Why this company specifically, using the research
-- Paragraph 2: What you have built that is directly relevant, resume only
-- Paragraph 3: What you want to do here and why it is a natural next step
+Use the company research from the previous task for the opening.
 
-No subject line. No greeting. Just the three paragraphs.
+Structure — three paragraphs, no greeting, no subject line:
+
+Paragraph 1: One specific thing about what this company builds or the
+problem they are solving. One sentence connecting that to something
+you have actually built. Keep it under 4 sentences total.
+
+Paragraph 2: Two or three specific things you have built that are
+directly relevant. Name the project. Name the tool. State what it did.
+No adjectives unless they come from the resume.
+
+Paragraph 3: What you want to work on here specifically. Not generic
+enthusiasm. A specific technical problem or product direction from the JD
+that connects to something real in your background.
         """,
-        expected_output="A 3-paragraph cover letter grounded in the resume.",
+        expected_output=(
+            "Three paragraphs. No greeting. No banned phrases. "
+            "Every claim traceable to the resume."
+        ),
         agent=drafter,
         context=[research_task],
     )
 
     refine_task = Task(
         description="""
-Refine the cover letter from the previous task.
+Read the cover letter from the previous task carefully.
 
-Remove: em dashes, passionate, excited, I would love to, I believe,
-I am eager, leverage, utilize, and any templated phrases.
+For every sentence that contains a banned phrase, rewrite the entire
+sentence from scratch without the phrase. Do not just delete the phrase
+and leave a broken sentence.
 
-Keep all project names, tool names, numbers, and results.
-Keep the three-paragraph structure.
-Output ONLY the final letter. Nothing before or after it.
+Banned phrases to eliminate:
+passionate, excited, I would love to, I believe, I am eager,
+leverage, utilize, aligns with, fast-paced, collaborative team,
+strong foundation, natural next step, driving innovation,
+delivering impact, I am comfortable, I am interested in,
+with my skills, make me a good fit, I am confident, I am dedicated,
+em dashes.
+
+After removing banned phrases, read the whole letter again and ask:
+does this sound like a real engineer or like a cover letter template?
+If it still sounds templated, rewrite those sentences.
+
+Output ONLY the final letter text.
+No "Here is the refined version." No preamble. No commentary.
+Start directly with the first paragraph.
         """,
-        expected_output="Final cover letter text only.",
+        expected_output=(
+            "Final cover letter only. "
+            "Starts directly with paragraph text, no preamble."
+        ),
         agent=refiner,
         context=[draft_task],
     )
