@@ -46,7 +46,8 @@ Job boards (Adzuna, Himalayas)
 | Drafting | CrewAI (Researcher → Drafter → Refiner agents, Groq LLM via LiteLLM) |
 | Faithfulness eval | Custom claim-extraction + per-claim verification (LangChain + Groq) |
 | Quality eval | Banned-phrase scan (deterministic, no LLM call) |
-| Frontend | React + Vite + Tailwind |
+| Frontend | React + Vite + Tailwind + Framer Motion |
+| Frontend data | Supabase JS client (`anon` key) + TanStack React Query |
 
 ## Repo structure
 
@@ -66,12 +67,24 @@ jobhunter/
 └── frontend/
     ├── index.html
     ├── package.json
-    ├── tailwind.config.js
+    ├── tailwind.config.js         # dark theme tokens: void/surface/signal/verify/flag/accent + glow shadows
+    ├── .env.local.example         # copy to .env.local, fill in Supabase anon key
     └── src/
-        ├── pages/               # MatchesDashboard, (MatchDetail — in progress)
-        ├── components/          # MatchCard, ScoreBadge, StatusPill
-        ├── data/                # mock data (being replaced by lib/supabaseClient.js)
-        └── lib/                 # Supabase client, read-only via anon key
+        ├── App.jsx                 # sidebar layout + React Query provider
+        ├── pages/
+        │   └── MatchesDashboard.jsx   # (MatchDetail — in progress)
+        ├── components/
+        │   ├── Sidebar.jsx            # nav with animated active-state pill
+        │   ├── StatsOverview.jsx      # animated stat counters
+        │   ├── MatchCard.jsx          # staggered entrance + status-colored glow on hover
+        │   ├── ScoreBadge.jsx
+        │   └── StatusPill.jsx
+        ├── hooks/
+        │   ├── useMatches.js          # React Query wrapper around fetchMatches
+        │   └── useMatchDetail.js
+        └── lib/
+            ├── supabaseClient.js      # reads VITE_ env vars, anon key only
+            └── matches.js             # real Supabase queries + JSON parsing for eval data
 ```
 
 ## Setup
@@ -94,7 +107,17 @@ jobhunter/
    python run_phase3.py
    python run_phase4.py
    ```
-5. For the frontend, see `frontend/README.md` (or the setup notes in this repo's Phase 5 section once added).
+5. For the frontend:
+   ```bash
+   cd frontend
+   npm install
+   cp .env.local.example .env.local
+   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (the anon/public key,
+   # never the service_role key from backend/.env)
+   npm run dev
+   ```
+   Requires Row Level Security (RLS) enabled on `matches` and `postings` with
+   a read-only policy, since the anon key is exposed in shipped frontend code.
 
 ## Progress
 
@@ -102,7 +125,7 @@ jobhunter/
 - **Phase 2** — Adzuna + Himalayas fetchers live; Upwork RSS and other sources dropped (broken/off-topic feeds). ✅
 - **Phase 3** — Resume + postings embedded, hybrid scoring (vector + BM25 + cross-encoder) working, top 5 matches stored per run. ✅ See `PHASE3_NOTES.md` for the full debugging log.
 - **Phase 4** — CrewAI drafting crew (Researcher → Drafter → Refiner, sequential) writes cover letters; faithfulness check (claim-by-claim verification against resume) and quality check (banned-phrase scan) run automatically before a draft is considered reviewable. ✅
-- **Phase 5** — React frontend to browse matches and review drafts without needing to query Supabase directly. 🔜 In progress — Matches Dashboard built, Match Detail page next.
+- **Phase 5** — React frontend to browse matches and review drafts without needing to query Supabase directly. 🔜 In progress — Matches Dashboard connected to live Supabase data, dark-themed redesign with sidebar nav, animated stats, and motion (Framer Motion) done. Match Detail page next.
 - **Phase 6** — Deployment (private access only). 🔜 Planned.
 
 ## Known limitations
@@ -119,3 +142,6 @@ jobhunter/
 - The CrewAI drafting crew currently requires a manual workaround for a
   known CrewAI bug (`cache_breakpoint` sent to non-Anthropic providers,
   e.g. Groq) — see the monkey-patch in `draft.py`'s imports.
+- Frontend currently reads matches directly from Supabase on every load —
+  no server-side caching yet. Fine at personal-project scale; would need
+  revisiting before wider use.
