@@ -11,13 +11,13 @@ for _parent in [Path(__file__).parent, Path(__file__).parent.parent]:
 from crewai import Agent, Task, Crew, Process, LLM
 from crewai_tools import TavilySearchTool
 
-
 def _get_llm():
     return LLM(
-        model="groq/llama-3.3-70b-versatile",
+        model="openai/llama-3.3-70b-versatile",
+        api_key=os.getenv("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
         temperature=0.3,
     )
-
 
 def _get_search_tool():
     return TavilySearchTool()
