@@ -6,7 +6,6 @@ scores them against a resume using hybrid vector + keyword search, and
 on postings worth applying to.
 
 **Status:** Phase 1–3 complete and working. Phase 4 planned.
-
 ---
 
 ## How it works
