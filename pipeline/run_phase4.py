@@ -13,7 +13,14 @@ from supabase import create_client
 from draft import draft_cover_letter
 from evaluate import score_faithfulness, score_quality
 
+def estimate_tokens(text: str) -> int:
+    # rough estimate: 1 token ≈ 4 chars for English
+    return len(text) // 4
 
+def will_exceed_limit(job_desc: str, resume: str, buffer: int = 1000) -> bool:
+    # prompt overhead ~500 tokens, buffer for safety
+    total = estimate_tokens(job_desc) + estimate_tokens(resume) + 500 + buffer
+    return total > 5500  # Groq free tier safe limit
 def run():
     print("\n── Phase 4: Draft + Evaluate ──\n")
 
@@ -72,7 +79,15 @@ def run():
         print(f"  [{i}/{len(matches.data)}] {p['title']} @ {company}")
         print(f"  match score: {match['score']:.3f}")
         print(f"{'═'*55}")
-
+        # In run_phase4.py, before calling draft_cover_letter
+if will_exceed_limit(p.get("description") or "", resume_content):
+    client.table("matches").update({
+        "draft_status": "failed_token_limit",
+        "token_estimate": estimate_tokens(p.get("description") or ""),
+        "draft_attempts": match.get("draft_attempts", 0) + 1
+    }).eq("id", match["id"]).execute()
+    print(f"  skipped — token limit: ~{estimate_tokens(p.get('description') or '')} tokens")
+    continue
         # Step 1: Draft
         print("\n  running drafting crew...")
         try:

@@ -5,7 +5,8 @@ from sentence_transformers import CrossEncoder
 from supabase import create_client
 
 TOP_K_RETRIEVE = 20      # candidates entering re-ranking
-TOP_K_RERANK = 5         # final shortlist stored to matches
+TOP_K_RERANK = 10         # final shortlist stored to matches
+THIN_DESCRIPTION_WORDS = 60  # below this, embedding quality is unreliable
 
 # The cross-encoder (ms-marco-MiniLM-L-6-v2) has a 512-token budget
 # covering BOTH sides of the pair combined. Truncate hard so the model
@@ -65,6 +66,15 @@ def score_postings(resume_text: str, resume_embedding: list[float]) -> list[dict
     # Step 5: Store top N
     qualified = reranked[:TOP_K_RERANK]
     stored = _store_matches(qualified)
+
+    # Step 6: Log every considered posting — this is what powers the
+    # dashboard's "why didn't this match" panel. Without this, a low
+    # score is a dead end with no explanation.
+    _log_considered_postings(
+        combined=combined,
+        reranked=reranked,
+        qualified_ids={q["id"] for q in qualified},
+    )
 
     print(f"  scored {len(combined)} postings → top {len(qualified)} selected → {stored} stored")
     return qualified
@@ -126,7 +136,7 @@ def _rrf_combine(
         vr = vector_rank.get(pid, len(vector_results))
         br = bm25_rank.get(pid, len(vector_results))
         rrf = 1 / (k + vr) + 1 / (k + br)
-        results.append({**posting, "rrf_score": rrf})
+        results.append({**posting, "rrf_score": rrf, "vector_rank": vr, "bm25_rank": br})
 
     return sorted(results, key=lambda x: x["rrf_score"], reverse=True)
 
@@ -185,6 +195,65 @@ def _cross_encoder_rerank(resume_text: str, candidates: list[dict]) -> list[dict
         print(f"    {r['final_score']:.3f}  {r.get('title')!r}")
 
     return reranked
+
+
+def _log_considered_postings(
+    combined: list[dict],
+    reranked: list[dict],
+    qualified_ids: set,
+) -> None:
+    """
+    Writes a row to match_log for every posting that was considered this
+    run, with a reason if it wasn't selected. This is what lets the
+    dashboard answer "why didn't this match?" instead of just showing
+    a bare score.
+
+    Reason categories, in the order they're checked:
+      - thin_description   : description too short to embed meaningfully,
+                              regardless of where it ranked
+      - rrf_ranked_below_top20 : never reached the cross-encoder at all —
+                              vector + keyword ranking wasn't strong enough
+      - cross_encoder_ranked_below_top5 : reached re-ranking but didn't
+                              make the final cut
+      - selected            : made it into matches
+    """
+    client = get_client()
+    reranked_ids = {r["id"] for r in reranked}
+    reranked_by_id = {r["id"]: r for r in reranked}
+
+    rows = []
+    for posting in combined:
+        pid = posting["id"]
+        description = posting.get("description", "") or ""
+        word_count = len(description.split())
+        is_thin = word_count < THIN_DESCRIPTION_WORDS
+
+        if pid in qualified_ids:
+            reason = "selected"
+        elif is_thin:
+            reason = "thin_description"
+        elif pid in reranked_ids:
+            reason = "cross_encoder_ranked_below_top5"
+        else:
+            reason = "rrf_ranked_below_top20"
+
+        r = reranked_by_id.get(pid, {})
+        rows.append({
+            "posting_id": pid,
+            "vector_rank": posting.get("vector_rank"),
+            "bm25_rank": posting.get("bm25_rank"),
+            "rrf_score": posting.get("rrf_score"),
+            "cross_encoder_score": r.get("cross_score"),
+            "final_score": r.get("final_score"),
+            "selected": pid in qualified_ids,
+            "reason": reason,
+            "description_word_count": word_count,
+        })
+
+    try:
+        client.table("match_log").insert(rows).execute()
+    except Exception as e:
+        print(f"  match_log write failed (non-fatal): {e}")
 
 
 def _store_matches(qualified: list[dict]) -> int:

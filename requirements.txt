@@ -15,3 +15,7 @@ langchain-community
 langchain-core
 tavily-python
 langchain-groq
+fastapi
+uvicorn
+fpdf2
+python-multipart

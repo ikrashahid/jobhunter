@@ -96,16 +96,22 @@ def embed_unembedded_postings(batch_size: int = 50) -> int:
 
     embedded = 0
     for posting in postings:
+        description = posting.get("description", "") or ""
+        word_count = len(description.split())
+
         # Combine title + description for richer embedding
         # Title gets repeated for emphasis — a trick that improves retrieval
-        text = f"{posting['title']} {posting['title']} {posting.get('description', '')}"
+        text = f"{posting['title']} {posting['title']} {description}"
         text = text[:2000]  # cap to avoid very long descriptions
 
         vector = embed_text(text)
 
         client.table("postings").update(
-            {"embedding": vector}
+            {"embedding": vector, "description_word_count": word_count}
         ).eq("id", posting["id"]).execute()
+
+        if word_count < 60:
+            print(f"    [thin description] '{posting['title']}' — only {word_count} words")
 
         embedded += 1
 

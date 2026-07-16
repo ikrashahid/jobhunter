@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { LayoutGrid, FileText, User, Sparkles } from "lucide-react";
+import { LayoutGrid, FileText, User, Sparkles, Activity } from "lucide-react";
 
 const NAV_ITEMS = [
+  { key: "pipeline", label: "Pipeline", icon: Activity },
   { key: "dashboard", label: "Matches", icon: LayoutGrid },
   { key: "drafts", label: "Drafts", icon: FileText },
   { key: "profile", label: "Resume", icon: User },
