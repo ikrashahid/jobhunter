@@ -168,7 +168,7 @@ export default function MatchesPage() {
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          
+            <a
             href={`${api.BASE}/api/matches/${match.id}/pdf/cover-letter`}
             target="_blank"
             style={{
@@ -183,7 +183,7 @@ export default function MatchesPage() {
           >
             Download Cover Letter PDF
           </a>
-          
+            <a
             href={`${api.BASE}/api/matches/${match.id}/pdf/fit`}
             target="_blank"
             style={{
@@ -251,7 +251,7 @@ export default function MatchesPage() {
             {expanded === match.id && (
               <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 20 }}>
                 <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-                  
+                    <a
                     href={match.postings?.url}
                     target="_blank"
                     rel="noreferrer"

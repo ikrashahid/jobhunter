@@ -36,6 +36,7 @@ from embed import embed_resume, embed_unembedded_postings
 from score import score_postings
 from draft import draft_cover_letter
 from evaluate import score_faithfulness, score_quality
+from interview_prep import requires_cover_letter, generate_interview_prep
 
 # ─────────────────────────────────────────────────────────────
 PAUSE_BETWEEN_DRAFTS = 5   # seconds — spacing between each match's LLM calls
@@ -59,6 +60,19 @@ def _section(title: str) -> None:
     print(f"{'═' * 60}")
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough 1-token-per-4-chars estimate — same heuristic run_phase4.py uses."""
+    return len(text) // 4
+
+
+def _will_exceed_limit(job_desc: str, resume: str) -> bool:
+    """True if job_desc + resume + prompt overhead would likely exceed
+    Groq's per-request token budget. Matches run_phase4.py's guard so
+    both entry points behave identically."""
+    total = _estimate_tokens(job_desc) + _estimate_tokens(resume) + 800
+    return total > 5500
+
+
 def run():
     global _run_start
     _run_start = time.time()
@@ -76,6 +90,9 @@ def run():
         "drafts_attempted": 0,
         "drafts_succeeded": 0,
         "drafts_failed": 0,
+        "cover_letters_written": 0,
+        "interview_preps_written": 0,
+        "skipped_token_limit": 0,
     }
 
     # ── PHASE 3, STEP 1: Embed resume ──────────────────────────
@@ -161,73 +178,131 @@ def run():
         )
         p = posting.data
         company = p.get("company") or "the company"
+        job_desc = p.get("description") or ""
 
         _section(f"[{i}/{len(undrafted.data)}] {p['title']} @ {company}  (score: {match['score']:.3f})")
         summary["drafts_attempted"] += 1
 
-        # Step 1: Draft
-        _log("running drafting crew (Researcher → Drafter → Refiner)...")
-        try:
-            result = draft_cover_letter(
-                job_title=p["title"],
-                company=company,
-                job_description=p.get("description") or "",
-                resume_sections=resume_sections,
-            )
-            draft_text = result["draft"]
-            _log(f"draft complete ({len(draft_text)} chars)"
-                 + (" — job description was truncated" if result.get("job_description_truncated") else ""))
-        except Exception as e:
-            _log(f"drafting FAILED: {e}")
-            summary["drafts_failed"] += 1
+        # ── Token limit guard — check BEFORE spending any LLM call ──
+        if _will_exceed_limit(job_desc, resume_content):
+            token_est = _estimate_tokens(job_desc)
+            _log(f"SKIPPED — token limit risk (~{token_est} estimated tokens in job description)")
+            summary["skipped_token_limit"] += 1
+            client.table("matches").update({
+                "draft_status": "failed_token_limit",
+                "token_estimate": token_est,
+                "draft_attempts": (match.get("draft_attempts") or 0) + 1,
+            }).eq("id", match["id"]).execute()
             _log(f"pausing {PAUSE_BETWEEN_DRAFTS}s before next match...")
             time.sleep(PAUSE_BETWEEN_DRAFTS)
             continue
 
-        # Step 2: Faithfulness eval
-        _log("running faithfulness evaluation...")
-        try:
-            faith_result = score_faithfulness(
-                draft=draft_text,
-                resume_sections=resume_sections,
-                job_description=p.get("description") or "",
-            )
-            _log(f"faithfulness: {faith_result.get('faithfulness_score')} — {faith_result.get('flag')}")
-        except Exception as e:
-            _log(f"faithfulness eval FAILED (non-fatal): {e}")
-            faith_result = {
-                "faithfulness_score": None,
-                "flag": "eval error",
-                "passes": True,
-                "verdicts": [],
+        # ── Decide: cover letter or interview prep ──
+        needs_cover_letter = requires_cover_letter(job_desc)
+        mode = "cover_letter" if needs_cover_letter else "interview_prep"
+        _log(f"mode: {mode}")
+
+        if mode == "cover_letter":
+            _log("running drafting crew (Researcher → Drafter → Refiner)...")
+            try:
+                result = draft_cover_letter(
+                    job_title=p["title"],
+                    company=company,
+                    job_description=job_desc,
+                    resume_sections=resume_sections,
+                )
+                draft_text = result["draft"]
+                _log(f"draft complete ({len(draft_text)} chars)")
+            except Exception as e:
+                _log(f"drafting FAILED: {e}")
+                summary["drafts_failed"] += 1
+                client.table("matches").update({
+                    "draft_status": "failed_other",
+                    "draft_attempts": (match.get("draft_attempts") or 0) + 1,
+                }).eq("id", match["id"]).execute()
+                _log(f"pausing {PAUSE_BETWEEN_DRAFTS}s before next match...")
+                time.sleep(PAUSE_BETWEEN_DRAFTS)
+                continue
+
+            # Faithfulness eval
+            _log("running faithfulness evaluation...")
+            try:
+                faith_result = score_faithfulness(
+                    draft=draft_text,
+                    resume_sections=resume_sections,
+                    job_description=job_desc,
+                )
+                _log(f"faithfulness: {faith_result.get('faithfulness_score')} — {faith_result.get('flag')}")
+            except Exception as e:
+                _log(f"faithfulness eval FAILED (non-fatal): {e}")
+                faith_result = {
+                    "faithfulness_score": None,
+                    "flag": "eval error",
+                    "passes": True,
+                    "verdicts": [],
+                }
+
+            # Quality eval (no LLM call, no pause needed)
+            quality_result = score_quality(draft_text)
+            _log(f"quality: {quality_result.get('quality_score')} — "
+                 f"{'clean' if quality_result.get('passes') else 'needs revision'}")
+
+            eval_metadata = {
+                "output_type": "cover_letter",
+                "faithfulness_score": faith_result.get("faithfulness_score"),
+                "total_claims": faith_result.get("total_claims"),
+                "supported_claims": faith_result.get("supported_claims"),
+                "faithfulness_flag": faith_result.get("flag"),
+                "verdicts": faith_result.get("verdicts", []),
+                "quality_score": quality_result.get("quality_score"),
+                "banned_phrases_found": quality_result.get("banned_found", []),
+                "quality_flag": "clean" if quality_result.get("passes") else "needs revision",
+                "company_research": result.get("company_research", ""),
             }
 
-        # Step 3: Quality eval (no LLM call, no pause needed)
-        quality_result = score_quality(draft_text)
-        _log(f"quality: {quality_result.get('quality_score')} — "
-             f"{'clean' if quality_result.get('passes') else 'needs revision'}")
+            client.table("matches").update({
+                "draft": draft_text,
+                "draft_status": "drafted",
+                "tailored_resume": json.dumps(eval_metadata),
+                "draft_attempts": (match.get("draft_attempts") or 0) + 1,
+            }).eq("id", match["id"]).execute()
 
-        # Step 4: Store
-        eval_metadata = {
-            "faithfulness_score": faith_result.get("faithfulness_score"),
-            "total_claims": faith_result.get("total_claims"),
-            "supported_claims": faith_result.get("supported_claims"),
-            "faithfulness_flag": faith_result.get("flag"),
-            "verdicts": faith_result.get("verdicts", []),
-            "quality_score": quality_result.get("quality_score"),
-            "banned_phrases_found": quality_result.get("banned_found", []),
-            "quality_flag": "clean" if quality_result.get("passes") else "needs revision",
-            "company_research": result.get("company_research", ""),
-            "job_description_truncated": result.get("job_description_truncated", False),
-        }
+            summary["drafts_succeeded"] += 1
+            summary["cover_letters_written"] += 1
+            _log("stored to Supabase (cover letter)")
 
-        client.table("matches").update({
-            "draft": draft_text,
-            "tailored_resume": json.dumps(eval_metadata),
-        }).eq("id", match["id"]).execute()
+        else:
+            # ── Interview prep mode — lighter, 2 LLM calls instead of 3 agents ──
+            _log("generating interview prep (2-call pipeline)...")
+            try:
+                prep_result = generate_interview_prep(
+                    job_title=p["title"],
+                    company=company,
+                    job_description=job_desc,
+                    resume_sections=resume_sections,
+                )
 
-        summary["drafts_succeeded"] += 1
-        _log("stored to Supabase")
+                client.table("matches").update({
+                    "draft": f"[INTERVIEW PREP]\n\n{json.dumps(prep_result)}",
+                    "draft_status": "drafted",
+                    "tailored_resume": json.dumps({
+                        "output_type": "interview_prep",
+                        "prep": prep_result,
+                    }),
+                    "draft_attempts": (match.get("draft_attempts") or 0) + 1,
+                }).eq("id", match["id"]).execute()
+
+                summary["drafts_succeeded"] += 1
+                summary["interview_preps_written"] += 1
+                _log("stored to Supabase (interview prep)")
+
+            except Exception as e:
+                _log(f"interview prep FAILED: {e}")
+                summary["drafts_failed"] += 1
+                client.table("matches").update({
+                    "draft_status": "failed_other",
+                    "draft_attempts": (match.get("draft_attempts") or 0) + 1,
+                }).eq("id", match["id"]).execute()
 
         if i < len(undrafted.data):
             _log(f"pausing {PAUSE_BETWEEN_DRAFTS}s before next match (rate limit spacing)...")
@@ -239,12 +314,15 @@ def run():
 def _print_summary(summary: dict) -> None:
     total_elapsed = time.time() - _run_start
     _section("PIPELINE RUN COMPLETE")
-    print(f"  total time          : {total_elapsed:.1f}s ({total_elapsed / 60:.1f} min)")
-    print(f"  postings embedded   : {summary['postings_embedded']}")
-    print(f"  matches scored      : {summary['matches_scored']}")
-    print(f"  drafts attempted    : {summary['drafts_attempted']}")
-    print(f"  drafts succeeded    : {summary['drafts_succeeded']}")
-    print(f"  drafts failed       : {summary['drafts_failed']}")
+    print(f"  total time            : {total_elapsed:.1f}s ({total_elapsed / 60:.1f} min)")
+    print(f"  postings embedded     : {summary['postings_embedded']}")
+    print(f"  matches scored        : {summary['matches_scored']}")
+    print(f"  drafts attempted      : {summary['drafts_attempted']}")
+    print(f"  drafts succeeded      : {summary['drafts_succeeded']}")
+    print(f"    cover letters       : {summary['cover_letters_written']}")
+    print(f"    interview preps     : {summary['interview_preps_written']}")
+    print(f"  drafts failed         : {summary['drafts_failed']}")
+    print(f"  skipped (token limit) : {summary['skipped_token_limit']}")
     print(f"{'═' * 60}\n")
 
 

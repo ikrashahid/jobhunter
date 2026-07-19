@@ -23,12 +23,23 @@ async def get_metrics():
     top5 = sorted_by_score[:5]
     top10 = sorted_by_score[:10]
 
-    def precision_at_k(top_k: list) -> float | None:
+    def precision_at_k(top_k: list) -> dict:
+        # Correct precision@k = good matches / k, NOT good / labeled.
+        # Excluding unlabeled items from the denominator silently inflates
+        # the score — e.g. 2 labeled-good out of 2 labeled items would
+        # previously report 1.0 even with 3 completely unverified slots
+        # in the same top-5. Unlabeled items count as "not yet verified,"
+        # not as excluded from the calculation.
+        k = len(top_k)
+        if k == 0:
+            return {"value": None, "labeled_in_k": 0, "k": 0}
+        good_in_k = [r for r in top_k if r.get("human_label") == "good_fit"]
         labeled_in_k = [r for r in top_k if r.get("human_label") in ("good_fit", "bad_fit")]
-        if not labeled_in_k:
-            return None
-        good_in_k = [r for r in labeled_in_k if r.get("human_label") == "good_fit"]
-        return round(len(good_in_k) / len(labeled_in_k), 3)
+        return {
+            "value": round(len(good_in_k) / k, 3),
+            "labeled_in_k": len(labeled_in_k),
+            "k": k,
+        }
 
     # Faithfulness and quality from tailored_resume JSON
     faithfulness_scores = []

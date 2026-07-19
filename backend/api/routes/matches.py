@@ -23,8 +23,18 @@ async def get_matches(
         .range((page - 1) * per_page, page * per_page - 1)
     )
 
+    # NOTE: the real column is `draft_status`, not `status` — matches
+    # what pipeline.py/run_phase4.py write and what the frontend reads.
+    # Using `status` here previously meant this filter (and the PATCH
+    # endpoint below) silently targeted a column that doesn't exist.
     if status:
-        query = query.eq("status", status)
+        query = query.eq("draft_status", status)
+
+    # Filtering on a joined table's column needs the `table.column` form
+    # in PostgREST — a plain `source` param was previously accepted but
+    # never actually applied to the query at all.
+    if source:
+        query = query.eq("postings.source", source)
 
     result = query.execute()
     return {
@@ -52,7 +62,10 @@ async def update_match(match_id: str, body: MatchStatusUpdate):
     client = get_client()
     update_data = {}
     if body.status is not None:
-        update_data["status"] = body.status
+        # Written to `draft_status` — see note above. This is the fix
+        # that makes the frontend's unseen/reviewing/applied/rejected
+        # buttons actually persist instead of only updating local state.
+        update_data["draft_status"] = body.status
     if body.human_label is not None:
         update_data["human_label"] = body.human_label
 

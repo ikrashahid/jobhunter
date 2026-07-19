@@ -9,8 +9,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://*.vercel.app",
     ],
+    # FastAPI's CORSMiddleware does exact string matching on allow_origins —
+    # "https://*.vercel.app" there would NEVER actually match a real
+    # deployed URL. allow_origin_regex is the correct way to allow any
+    # Vercel preview/production subdomain.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

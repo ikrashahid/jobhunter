@@ -6,8 +6,14 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from "recharts";
 
+interface PrecisionAtK {
+  value: number | null;
+  labeled_in_k: number;
+  k: number;
+}
+
 interface Metrics {
-  precision: { at_5: number | null; at_10: number | null; labeled_count: number; good_fit_count: number };
+  precision: { at_5: PrecisionAtK; at_10: PrecisionAtK; labeled_count: number; good_fit_count: number };
   faithfulness: { mean: number | null; min: number | null; max: number | null; sample_count: number };
   quality: { mean: number | null; min: number | null; max: number | null; sample_count: number };
   pipeline: { draft_success_count: number; token_failure_count: number; total_matches: number };
@@ -76,16 +82,28 @@ export default function MetricsPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <MetricBlock
                 label="Precision@5"
-                value={pct(metrics.precision.at_5)}
-                sub="top 5 matches"
-                color={metrics.precision.at_5 && metrics.precision.at_5 >= 0.6 ? "var(--green)" : "var(--amber)"}
+                value={pct(metrics.precision.at_5.value)}
+                sub={`${metrics.precision.at_5.labeled_in_k}/${metrics.precision.at_5.k} labeled`}
+                color={
+                  metrics.precision.at_5.value !== null && metrics.precision.at_5.value >= 0.6
+                    ? "var(--green)" : "var(--amber)"
+                }
               />
               <MetricBlock
                 label="Precision@10"
-                value={pct(metrics.precision.at_10)}
-                sub="top 10 matches"
-                color={metrics.precision.at_10 && metrics.precision.at_10 >= 0.5 ? "var(--green)" : "var(--amber)"}
+                value={pct(metrics.precision.at_10.value)}
+                sub={`${metrics.precision.at_10.labeled_in_k}/${metrics.precision.at_10.k} labeled`}
+                color={
+                  metrics.precision.at_10.value !== null && metrics.precision.at_10.value >= 0.5
+                    ? "var(--green)" : "var(--amber)"
+                }
               />
+            </div>
+          )}
+          {!noLabels && (metrics.precision.at_5.labeled_in_k < metrics.precision.at_5.k) && (
+            <div style={{ fontSize: 11, color: "var(--amber)", marginTop: 8, textAlign: "center" }}>
+              Not all top matches are labeled yet — this score will get more
+              accurate as you label more.
             </div>
           )}
           <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
@@ -125,7 +143,7 @@ export default function MetricsPage() {
                 <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <Tooltip
                   contentStyle={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6 }}
-                  formatter={(v: number) => `${Math.round(v * 100)}%`}
+                  formatter={(v) => `${Math.round(Number(v ?? 0) * 100)}%`}
                 />
                 <Bar dataKey="value" fill="var(--green)" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -149,7 +167,7 @@ export default function MetricsPage() {
                 <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <Tooltip
                   contentStyle={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6 }}
-                  formatter={(v: number) => `${Math.round(v * 100)}%`}
+                  formatter={(v) => `${Math.round(Number(v ?? 0) * 100)}%`}
                 />
                 <Bar dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
