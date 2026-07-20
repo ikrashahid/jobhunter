@@ -1,0 +1,473 @@
+.stage {
+  position: relative;
+  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b1210;
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 30%, rgba(125, 211, 199, 0.18), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(196, 163, 90, 0.12), transparent 50%),
+    linear-gradient(180deg, #152018 0%, #0b1210 55%, #0e1614 100%);
+  transition: opacity 1.2s ease, filter 1.2s ease;
+}
+
+.ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28%;
+  background: linear-gradient(180deg, transparent, rgba(30, 42, 36, 0.85) 30%, #15201c);
+  pointer-events: none;
+}
+
+.campusLayer {
+  position: absolute;
+  left: 4%;
+  bottom: 22%;
+  width: min(42vw, 420px);
+  height: 280px;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+  pointer-events: none;
+}
+
+.phase_campus .campusLayer,
+.phase_walk .campusLayer,
+.phase_bus .campusLayer {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.phase_desk .campusLayer,
+.phase_click .campusLayer,
+.phase_form .campusLayer {
+  opacity: 0.15;
+  transform: translateY(8px) scale(0.92);
+  filter: blur(2px);
+}
+
+.uni {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  width: 160px;
+  height: auto;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45));
+}
+
+.graduate {
+  position: absolute;
+  left: 130px;
+  bottom: 28px;
+  width: 64px;
+  opacity: 0;
+  transform: translateX(0);
+}
+
+.phase_campus .graduate {
+  opacity: 1;
+  transition: opacity 0.6s ease 0.8s;
+}
+
+.phase_walk .graduate,
+.phase_bus .graduate {
+  opacity: 1;
+}
+
+.graduateWalk {
+  animation: walkAcross 2.6s ease-in-out forwards;
+}
+
+.graduateSvg {
+  width: 64px;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.diploma {
+  transform-origin: 50px 63px;
+  animation: diplomaBob 1.2s ease-in-out infinite;
+}
+
+.legL,
+.legR {
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+
+.graduateWalk .legL {
+  animation: stepL 0.4s ease-in-out infinite;
+}
+
+.graduateWalk .legR {
+  animation: stepR 0.4s ease-in-out infinite;
+}
+
+@keyframes walkAcross {
+  0% { transform: translateX(0); opacity: 1; }
+  85% { transform: translateX(280px); opacity: 1; }
+  100% { transform: translateX(340px); opacity: 0; }
+}
+
+@keyframes stepL {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(10deg); }
+}
+
+@keyframes stepR {
+  0%, 100% { transform: rotate(10deg); }
+  50% { transform: rotate(-12deg); }
+}
+
+@keyframes diplomaBob {
+  0%, 100% { transform: rotate(-18deg) translateY(0); }
+  50% { transform: rotate(-12deg) translateY(-2px); }
+}
+
+.busLayer {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: 18%;
+  height: 100px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+
+.phase_bus .busLayer {
+  opacity: 1;
+}
+
+.phase_desk .busLayer,
+.phase_click .busLayer,
+.phase_form .busLayer {
+  opacity: 0;
+}
+
+.route {
+  width: 100%;
+  height: 80px;
+  overflow: visible;
+}
+
+.routePath {
+  fill: none;
+  stroke: rgba(125, 211, 199, 0.55);
+  stroke-width: 3;
+  stroke-dasharray: 8 10;
+  stroke-linecap: round;
+  animation: dashMove 1.2s linear infinite;
+}
+
+.routeDot {
+  fill: #c4a35a;
+}
+
+.routeLabel {
+  fill: rgba(232, 232, 232, 0.55);
+  font-size: 11px;
+  font-family: var(--font-body), sans-serif;
+}
+
+.bus {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 88px;
+  opacity: 0;
+}
+
+.phase_bus .bus {
+  animation: busRide 2.6s ease-in-out forwards;
+}
+
+.busSvg {
+  width: 88px;
+  height: auto;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.4));
+}
+
+@keyframes dashMove {
+  to { stroke-dashoffset: -36; }
+}
+
+@keyframes busRide {
+  0% { left: 2%; opacity: 0; transform: translateY(6px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; }
+  100% { left: 88%; opacity: 0; transform: translateY(-4px); }
+}
+
+.deskLayer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+  pointer-events: none;
+}
+
+.phase_desk .deskLayer,
+.phase_click .deskLayer {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.phase_form .deskLayer {
+  opacity: 0.35;
+  filter: blur(3px);
+  transform: scale(1.02);
+}
+
+.desk {
+  width: min(90vw, 480px);
+}
+
+.deskSvg {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+}
+
+.jhBtn {
+  fill: #2f6f6a;
+}
+
+.jhBtnActive {
+  fill: #3d9a90;
+  animation: btnPulse 0.6s ease;
+}
+
+.jhBtnText {
+  fill: #e8fff8;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--font-display), serif;
+  pointer-events: none;
+}
+
+.cursor {
+  transform-origin: 188px 118px;
+  opacity: 0.9;
+}
+
+.cursorClick {
+  animation: clickTap 0.7s ease forwards;
+}
+
+@keyframes btnPulse {
+  0%, 100% { filter: brightness(1); }
+  40% { filter: brightness(1.35); }
+}
+
+@keyframes clickTap {
+  0% { transform: translate(12px, 18px) scale(1); }
+  45% { transform: translate(0, 0) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.formWrap {
+  position: relative;
+  z-index: 5;
+  width: min(92vw, 400px);
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+
+.formVisible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.glass {
+  padding: 36px 32px 32px;
+  border-radius: 20px;
+  background: rgba(18, 28, 26, 0.55);
+  border: 1px solid rgba(125, 211, 199, 0.22);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.brand {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #7dd3c7;
+  margin-bottom: 6px;
+}
+
+.headline {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: #f2f5f3;
+  margin-bottom: 8px;
+}
+
+.sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(232, 232, 232, 0.62);
+  margin-bottom: 24px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(232, 232, 232, 0.7);
+  font-weight: 500;
+}
+
+.input {
+  appearance: none;
+  border: 1px solid rgba(125, 211, 199, 0.25);
+  background: rgba(8, 14, 12, 0.55);
+  color: #f2f5f3;
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus {
+  border-color: rgba(125, 211, 199, 0.65);
+  box-shadow: 0 0 0 3px rgba(125, 211, 199, 0.15);
+}
+
+.submit {
+  margin-top: 6px;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: #0b1210;
+  background: linear-gradient(135deg, #7dd3c7, #4fa89e);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.error {
+  color: #f07178;
+  font-size: 12px;
+}
+
+.skip {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 6;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(232, 232, 232, 0.75);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  font-family: inherit;
+}
+
+.skip:hover {
+  color: #fff;
+  border-color: rgba(125, 211, 199, 0.4);
+}
+
+.caption {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 15px;
+  color: rgba(232, 232, 232, 0.55);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .campusLayer {
+    width: 70vw;
+    bottom: 30%;
+  }
+
+  .uni {
+    width: 120px;
+  }
+
+  .glass {
+    padding: 28px 22px 24px;
+  }
+
+  .brand {
+    font-size: 24px;
+  }
+
+  .caption {
+    font-size: 13px;
+    bottom: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graduateWalk,
+  .phase_bus .bus,
+  .routePath,
+  .diploma,
+  .graduateWalk .legL,
+  .graduateWalk .legR,
+  .cursorClick,
+  .jhBtnActive {
+    animation: none !important;
+  }
+
+  .formWrap {
+    transition: none;
+  }
+}
