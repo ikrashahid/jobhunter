@@ -6,9 +6,28 @@
  * to the browser (no NEXT_PUBLIC_ backend vars).
  */
 
+async function readError(res: Response, path: string, method: string): Promise<never> {
+  let detail = "";
+  try {
+    const data = await res.json();
+    detail = data.error || data.detail || JSON.stringify(data);
+  } catch {
+    try {
+      detail = (await res.text()).slice(0, 200);
+    } catch {
+      detail = "";
+    }
+  }
+  throw new Error(
+    detail
+      ? `${method} ${path} failed: ${res.status} — ${detail}`
+      : `${method} ${path} failed: ${res.status}`
+  );
+}
+
 async function get(path: string) {
   const res = await fetch(path, { cache: "no-store" });
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  if (!res.ok) return readError(res, path, "GET");
   return res.json();
 }
 
@@ -19,7 +38,7 @@ async function post(path: string, body: unknown) {
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+  if (!res.ok) return readError(res, path, "POST");
   return res.json();
 }
 
@@ -29,7 +48,7 @@ async function patch(path: string, body: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`);
+  if (!res.ok) return readError(res, path, "PATCH");
   return res.json();
 }
 

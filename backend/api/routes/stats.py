@@ -26,8 +26,21 @@ async def get_stats():
         s = row["source"]
         source_breakdown[s] = source_breakdown.get(s, 0) + 1
 
-    pipeline_runs = client.table("pipeline_runs").select("*").order("run_at", desc=True).limit(1).execute()
-    last_run = pipeline_runs.data[0]["run_at"] if pipeline_runs.data else None
+    # schema.sql uses started_at (not run_at). Don't let a missing/empty
+    # pipeline_runs table take down the whole dashboard.
+    last_run = None
+    try:
+        pipeline_runs = (
+            client.table("pipeline_runs")
+            .select("started_at, finished_at, status")
+            .order("started_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if pipeline_runs.data:
+            last_run = pipeline_runs.data[0].get("started_at")
+    except Exception:
+        last_run = None
 
     return {
         "postings": {
