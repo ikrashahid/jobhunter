@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
-// The cookie value is a signed token, not the raw password — so even
-// if someone inspects cookies in devtools, they can't reuse the value
-// to forge a session without knowing AUTH_SECRET too.
 function makeToken(): string {
   const secret = process.env.AUTH_SECRET || "";
   return crypto.createHmac("sha256", secret).update("authenticated").digest("hex");
@@ -22,13 +19,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Timing-safe comparison so response time doesn't leak how much of
-  // the password was guessed correctly.
   const usernameOk =
-    username?.length === validUsername.length &&
+    typeof username === "string" &&
+    username.length === validUsername.length &&
     crypto.timingSafeEqual(Buffer.from(username), Buffer.from(validUsername));
   const passwordOk =
-    password?.length === validPassword.length &&
+    typeof password === "string" &&
+    password.length === validPassword.length &&
     crypto.timingSafeEqual(Buffer.from(password), Buffer.from(validPassword));
 
   if (!usernameOk || !passwordOk) {
@@ -38,9 +35,10 @@ export async function POST(req: NextRequest) {
   const response = NextResponse.json({ ok: true });
   response.cookies.set("jobhunter_auth", makeToken(), {
     httpOnly: true,
-    secure: true,
+    // localhost is http — secure cookies would never stick in dev
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: 60 * 60 * 24 * 30,
     path: "/",
   });
 
