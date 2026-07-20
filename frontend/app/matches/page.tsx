@@ -169,8 +169,9 @@ export default function MatchesPage() {
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <a
-            href={`${api.BASE}/api/matches/${match.id}/pdf/cover-letter`}
+            href={`/api/matches/${match.id}/pdf/cover-letter`}
             target="_blank"
+            rel="noreferrer"
             style={{
               padding: "6px 14px",
               borderRadius: 6,
@@ -184,8 +185,9 @@ export default function MatchesPage() {
             Download Cover Letter PDF
           </a>
             <a
-            href={`${api.BASE}/api/matches/${match.id}/pdf/fit`}
+            href={`/api/matches/${match.id}/pdf/fit`}
             target="_blank"
+            rel="noreferrer"
             style={{
               padding: "6px 14px",
               borderRadius: 6,
@@ -207,10 +209,11 @@ export default function MatchesPage() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Top Matches</h1>
-        <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
-          {matches.length} matches — click any row to expand
-        </div>
+        <div className="page-kicker">Review queue</div>
+        <h1 className="page-title">Top Matches</h1>
+        <p className="page-sub">
+          {matches.length} matches — expand a row, then label good fit / bad fit for precision@k
+        </p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

@@ -57,10 +57,11 @@ export default function AnalyzePage() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Analyze Job Description</h1>
-        <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
-          Paste any JD — from LinkedIn, email, anywhere. Get role breakdown, CV fit map, and interview prep.
-        </div>
+        <div className="page-kicker">Before you apply</div>
+        <h1 className="page-title">Analyze Job Description</h1>
+        <p className="page-sub">
+          Paste any JD — role breakdown, CV fit map, and interview prep in one pass.
+        </p>
       </div>
 
       <Card style={{ marginBottom: 20 }}>

@@ -76,8 +76,9 @@ export default function Dashboard() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Pipeline Dashboard</h1>
-          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
+          <div className="page-kicker">Pipeline</div>
+          <h1 className="page-title">Dashboard</h1>
+          <div className="page-sub">
             {stats.last_run
               ? `Last run: ${new Date(stats.last_run).toLocaleString()}`
               : "No pipeline runs recorded yet"}

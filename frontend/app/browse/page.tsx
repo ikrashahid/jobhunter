@@ -154,10 +154,11 @@ export default function BrowsePage() {
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Browse Matches</h1>
-        <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
-          {matches.length} matches at 50%+ — click a job to see details
-        </div>
+        <div className="page-kicker">From campus to inbox</div>
+        <h1 className="page-title">Browse Matches</h1>
+        <p className="page-sub">
+          {matches.length} matches at 50%+ — open a role to review the draft or interview prep
+        </p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 20, alignItems: "start" }}>

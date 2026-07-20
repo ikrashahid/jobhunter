@@ -65,10 +65,11 @@ export default function MetricsPage() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Eval Metrics</h1>
-        <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
+        <div className="page-kicker">How honest is the hunt</div>
+        <h1 className="page-title">Eval Metrics</h1>
+        <p className="page-sub">
           Label matches on the Matches page to unlock precision@k scores
-        </div>
+        </p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>

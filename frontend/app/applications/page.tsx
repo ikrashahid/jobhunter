@@ -62,10 +62,11 @@ export default function ApplicationsPage() {
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Applications</h1>
-        <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
-          {matches.length} jobs marked "applied" — track outcome and date here
-        </div>
+        <div className="page-kicker">Out in the wild</div>
+        <h1 className="page-title">Applications</h1>
+        <p className="page-sub">
+          {matches.length} roles marked applied — track outcome and date here
+        </p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

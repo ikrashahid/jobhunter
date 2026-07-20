@@ -2,7 +2,7 @@
 
 Personal automation pipeline that scrapes job listings, scores them against a resume using hybrid vector + keyword search, drafts tailored cover letters (or interview prep when no letter is needed), fact-checks its own drafts, and exposes everything in a private Next.js dashboard.
 
-**Status:** Phases 1–5 are working end-to-end. Auth gate is partially scaffolded. Deployment hardening is next.
+**Status:** Phases 1–5 working. Login + FastAPI shared-secret + Next.js proxy are in place. Schedule the pipeline only after Railway has `API_KEY` set.
 
 ---
 
@@ -47,7 +47,7 @@ Job boards (Adzuna, Himalayas, RemoteOK, Arbeitnow, Jobicy)
 | Quality eval | Banned-phrase scan (deterministic) |
 | Backend API | FastAPI + Uvicorn |
 | Frontend | Next.js 16 (App Router) + React 19 + Tailwind 4 + Recharts |
-| Auth (in progress) | Cookie session (`jobhunter_auth` HMAC) + login API route |
+| Auth | Cookie session on Next.js (`jobhunter_auth` HMAC) + FastAPI `X-API-Key` + same-origin proxy |
 
 ---
 
@@ -77,7 +77,8 @@ jobhunter/
 │   └── run_phase4.py          # draft + evaluate only
 │
 ├── backend/api/               # FastAPI service the frontend talks to
-│   ├── main.py                # CORS + routers
+│   ├── main.py                # CORS + routers + API-key dependency
+│   ├── deps.py                # require_api_key + trigger rate limit
 │   ├── models.py
 │   ├── routes/
 │   │   ├── stats.py           # GET /api/stats
@@ -85,14 +86,15 @@ jobhunter/
 │   │   ├── analyze.py         # POST /api/analyze-jd
 │   │   ├── metrics.py         # GET /api/metrics (precision@k, faithfulness, quality)
 │   │   ├── pdf.py             # PDF export helpers
-│   │   └── trigger.py         # POST /api/trigger/{fetch,score,draft}
+│   │   └── trigger.py         # POST /api/trigger/{fetch,score,draft} (rate-limited)
 │   └── services/
 │       ├── db.py
 │       ├── jd_analyzer.py
 │       └── pdf_gen.py
 │
 └── frontend/                  # Next.js App Router UI
-    ├── .env.local             # NEXT_PUBLIC_API_URL + AUTH_* (gitignored)
+    ├── .env.local             # BACKEND_URL + API_KEY + AUTH_* (server-only, gitignored)
+    ├── proxy.ts               # Cookie gate for all pages/API except /login
     ├── app/
     │   ├── page.tsx           # Pipeline dashboard (stats + trigger buttons)
     │   ├── browse/            # High-score match browser + draft/prep panel
@@ -100,10 +102,13 @@ jobhunter/
     │   ├── applications/      # Applied roles + outcome tracking
     │   ├── analyze/           # Paste-a-JD fit analyzer
     │   ├── metrics/           # Precision@k + draft quality charts
-    │   ├── login/             # Auth UI (scaffold — see Known issues)
-    │   └── api/login/         # POST credentials → signed cookie
-    ├── components/            # Nav, Card
-    └── lib/api.ts             # fetch wrapper → FastAPI
+    │   ├── login/             # Animated story + glass login form
+    │   └── api/
+    │       ├── login/         # Cookie auth
+    │       ├── logout/
+    │       └── [...path]/    # Server-side proxy → FastAPI (adds X-API-Key)
+    ├── components/            # Nav, Card, AppShell
+    └── lib/api.ts             # Browser fetch → same-origin /api/* only
 ```
 
 ---
@@ -118,7 +123,7 @@ jobhunter/
 | `/applications` | Roles marked `applied` — set outcome (got role / no response / rejected) and applied date |
 | `/analyze` | Paste any JD → role summary, fit analysis, interview questions |
 | `/metrics` | Precision@5/@10, faithfulness/quality means, draft success stats |
-| `/login` | Private gate (API route exists; page/middleware wiring incomplete — see below) |
+| `/login` | Animated intro + glass username/password form |
 
 ---
 
@@ -130,7 +135,7 @@ Apply `schema.sql` in the Supabase SQL editor (enables `pgvector` and creates `p
 
 ### 2. Backend env
 
-Create `.env` at the **repo root** (also loaded by `pipeline/` and `scrapers/`):
+Copy `.env.example` → `.env` at the **repo root** (also loaded by `pipeline/` and `scrapers/`):
 
 ```
 SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
@@ -139,7 +144,11 @@ GROQ_API_KEY=your_groq_key
 TAVILY_API_KEY=your_tavily_key
 ADZUNA_APP_ID=...
 ADZUNA_APP_KEY=...
+API_KEY=generate-a-long-random-string
+CORS_ORIGINS=http://localhost:3000
 ```
+
+`API_KEY` is required — every `/api/*` route (except `/health`) rejects requests without a matching `X-API-Key` header.
 
 Activate the `job` conda env (or any env with `requirements.txt` installed):
 
@@ -163,54 +172,76 @@ python run_phase4.py   # draft + evaluate
 
 ### 4. Start the API
 
-From the repo root (so `api` imports resolve):
+From `backend/` (so `api` imports resolve):
 
 ```bash
 cd backend
 uvicorn api.main:app --reload --port 8000
 ```
 
-Health check: `GET http://localhost:8000/health`
+Health check (no key): `GET http://localhost:8000/health`  
+Data routes need: `X-API-Key: <same as API_KEY>`
 
 ### 5. Start the frontend
 
 ```bash
 cd frontend
 npm install
+cp .env.local.example .env.local
 ```
 
-Create `frontend/.env.local`:
+`frontend/.env.local` (all **server-only** — never `NEXT_PUBLIC_` for backend):
 
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000
+BACKEND_URL=http://localhost:8000
+API_KEY=same-value-as-root-env-API_KEY
 AUTH_USERNAME=your_username
 AUTH_PASSWORD=your_password
-AUTH_SECRET=long-random-string
+AUTH_SECRET=another-long-random-string
 ```
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). The browser only talks to Next.js; Next.js adds `X-API-Key` when proxying to FastAPI.
+
+### Deploy env checklist
+
+| Where | Must set |
+|---|---|
+| Railway (FastAPI) | `API_KEY`, Supabase/Groq/etc., optional `CORS_ORIGINS=https://your-app.vercel.app`, `TRIGGER_COOLDOWN_SEC` |
+| Vercel (Next.js) | `BACKEND_URL` (Railway URL), `API_KEY` (same), `AUTH_USERNAME`, `AUTH_PASSWORD`, `AUTH_SECRET` |
+
+Do **not** set `NEXT_PUBLIC_API_URL` — that was the hole that exposed Railway to the browser.
 
 ---
 
-## Auth (current state)
+## Security
 
-Private access is started but not fully wired:
+Two gates, both required:
 
-- **Done:** `POST /api/login` validates username/password with timing-safe compares, sets an HttpOnly `jobhunter_auth` cookie (HMAC of `"authenticated"` with `AUTH_SECRET`).
-- **Incomplete:** `app/login/page.tsx` currently contains middleware-style proxy code instead of a login UI, and there is no `middleware.ts` at the frontend root to enforce the cookie on protected routes.
+1. **Next.js cookie gate** (`proxy.ts`) — HMAC-signed HttpOnly `jobhunter_auth` cookie; timing-safe login compare; API callers get JSON 401 (not an HTML redirect).
+2. **FastAPI shared secret** — every data/trigger route requires `X-API-Key` matching `API_KEY`. `/health` stays open for uptime checks only.
 
-Until that is finished, treat the app as local-only (or put it behind another gate). Do not rely on the cookie gate alone in production.
+**Browser never sees the backend.** `lib/api.ts` calls same-origin `/api/*`. `app/api/[...path]/route.ts` forwards to `BACKEND_URL` and injects the key. Login/logout routes are more specific and are not proxied.
 
-**Planned hardening:**
-- Move cookie check into `frontend/middleware.ts`
-- Build a real `/login` form
-- Keep `AUTH_*` server-only (never `NEXT_PUBLIC_`)
-- Prefer `secure` cookies in production, short session TTL + rotate `AUTH_SECRET`
-- Lock down FastAPI (shared secret / same-origin proxy) so the API is not open if the frontend URL leaks
+**CORS** is an allowlist from `CORS_ORIGINS` (default `http://localhost:3000`). No `*.vercel.app` regex. With the proxy in place, browsers shouldn't hit Railway at all — CORS is belt-and-braces.
+
+**Triggers** (`/api/trigger/*`) additionally:
+- Require the API key (same as everything else)
+- Enforce a per-action cooldown (default 120s via `TRIGGER_COOLDOWN_SEC`)
+- Block overlapping runs with an in-process in-flight lock
+
+**Secrets audit:** `.env` / `.env.local` are gitignored. `git rev-list --all -- .env` is empty in this repo (never committed). If you ever rewrite history that contained secrets, rotate Supabase/Groq/Adzuna/Tavily/`API_KEY`/`AUTH_*` anyway.
+
+**Still optional / later:**
+- Wire `pipeline_runs` writers for run history
+- Drop vestigial `applications` table once confirmed unused
+- `pip-audit` / `npm audit` on a schedule
+- RLS on Supabase is optional while only the service-role backend touches Postgres
+
+**Ops:** commit/tag before pipeline changes that write production `matches`/`postings`. Schedule fetch→score→draft (Railway cron or GitHub Actions) only with `X-API-Key`, never against an open URL.
 
 ---
 
@@ -223,7 +254,7 @@ Until that is finished, treat the app as local-only (or put it behind another ga
 | 3 | Embed + hybrid score + rerank | ✅ |
 | 4 | Draft / interview prep + faithfulness & quality | ✅ |
 | 5 | Next.js UI + FastAPI | ✅ Dashboard, Browse, Matches, Applications, Analyze, Metrics |
-| 6 | Auth gate + private deploy | 🔜 Login API exists; middleware/UI unfinished |
+| 6 | Auth + API lockdown | ✅ Cookie gate, animated login, `X-API-Key`, Next.js proxy, pinned CORS, trigger cooldown |
 
 ---
 
@@ -252,8 +283,7 @@ Until that is finished, treat the app as local-only (or put it behind another ga
 - `pipeline_runs` is defined in `schema.sql` but not yet populated by `pipeline.py` / phase runners — dashboard `last_run` may stay empty.
 - `applications` table is legacy; live tracking uses `matches.draft_status` (`applied`, etc.) plus application outcome fields.
 - API trigger `/api/trigger/fetch` runs `scrapers/run.py` (Adzuna + Himalayas only), not `fetch_all_sources.py`.
-- Frontend auth gate is incomplete (see Auth section).
-- FastAPI CORS allows localhost + `*.vercel.app`; the API itself has no auth middleware yet.
+- Trigger rate limits are in-process (per Railway worker) — fine for a single instance.
 
 ---
 
