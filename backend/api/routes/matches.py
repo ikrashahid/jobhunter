@@ -68,6 +68,12 @@ async def update_match(match_id: str, body: MatchStatusUpdate):
         update_data["draft_status"] = body.status
     if body.human_label is not None:
         update_data["human_label"] = body.human_label
+    if body.application_status is not None:
+        # 'red' | 'yellow' | 'green' — tracked separately from draft_status,
+        # which is already overloaded (pipeline status + review status).
+        update_data["application_status"] = body.application_status
+    if body.applied_at is not None:
+        update_data["applied_at"] = body.applied_at.isoformat()
 
     if not update_data:
         return {"error": "nothing to update"}

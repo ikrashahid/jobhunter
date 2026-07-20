@@ -5,7 +5,7 @@ from sentence_transformers import CrossEncoder
 from supabase import create_client
 
 TOP_K_RETRIEVE = 20      # candidates entering re-ranking
-TOP_K_RERANK = 10         # final shortlist stored to matches
+TOP_K_RERANK = 10         # final shortlist stored to 10 
 THIN_DESCRIPTION_WORDS = 60  # below this, embedding quality is unreliable
 
 # The cross-encoder (ms-marco-MiniLM-L-6-v2) has a 512-token budget
