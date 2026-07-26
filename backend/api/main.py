@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.deps import require_api_key
-from api.routes import analyze, matches, metrics, pdf, stats, trigger
+from api.routes import analyze, email_alert, matches, metrics, pdf, stats, trigger
 
 app = FastAPI(title="Job Copilot API", version="1.0.0")
 
@@ -33,6 +33,7 @@ app.include_router(analyze.router, prefix="/api", dependencies=_protected)
 app.include_router(metrics.router, prefix="/api", dependencies=_protected)
 app.include_router(pdf.router, prefix="/api", dependencies=_protected)
 app.include_router(trigger.router, prefix="/api", dependencies=_protected)
+app.include_router(email_alert.router, prefix="/api", dependencies=_protected)
 
 
 @app.get("/")

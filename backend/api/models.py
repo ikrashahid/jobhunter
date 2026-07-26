@@ -16,3 +16,10 @@ class JDAnalyzeRequest(BaseModel):
 
 class TriggerDraftRequest(BaseModel):
     match_ids: Optional[list[str]] = None  # if None, drafts all pending
+
+
+class EmailAlertRequest(BaseModel):
+    subject: str
+    snippet: Optional[str] = None
+    from_: Optional[str] = None
+    date: Optional[str] = None
